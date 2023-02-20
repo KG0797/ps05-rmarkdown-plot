@@ -1,0 +1,249 @@
+---
+title: "ps5"
+author: "Katherine Guo"
+date: "2023-02-19"
+output: html_document
+---
+
+## 1 Load and check data(5pt)
+
+#### 1.2
+
+```{r dataset}
+library(readr)
+gapminder <- read.delim("C:/Users/Katherine Guo/Desktop/info 201/ps05-rmarkdown-plot/gapminder.csv/gapminder.csv")
+
+nrow(gapminder)
+ncol(gapminder)
+```
+
+#### 1.3
+
+Prints a small sample of data
+The data looks OK.
+
+```{r sample}
+head(gapminder)
+```
+
+## 2. Descriptive statistics(15pt)
+
+#### 2.1 iso3: 253 iso2: 249 name: 250
+
+```{r }
+library(dplyr)
+gapminder %>% 
+  select(iso3, iso2, name) %>% 
+  summarise(n1 =n_distinct(iso3), n2 = n_distinct(iso2), n3 = n_distinct(name))
+```
+
+#### 2.2 (a) The table below shows how many names are there for each iso-2 code. There is one iso-2 codes that correspond to more than one name, *Namibia*.
+
+```{r}
+gapminder %>%
+  select(name, iso2) %>%
+  group_by(iso2) %>%
+  summarise(unique = n_distinct(name), name = paste(unique(name), collapse = ", ")) %>%
+  arrange(desc(unique))
+```
+
+#### 2.2 (b) The table below shows how many names are there for each iso-3 code. There are **4** iso-3 codes that correspond to more than one name. They are "CHANISL, GBM, KOS, NLD_CURACAO".
+
+```{r}
+gapminder %>% 
+  group_by(name, iso3) %>%
+  summarise(number = n_distinct(iso3), .groups = "drop") %>% 
+  arrange(desc(number))
+```
+
+#### 2.3 The minimum year is: 1960 The maximum year is: 2019
+
+```{r max/min}
+gapminder %>%
+  select(time) %>% 
+  filter(!is.na(time)) %>% 
+  summarise(min(time), max(time))
+  
+```
+
+## 3 CO2 emissions(30pt)
+
+#### 3.1 Year **2017**,**2018**,**2019** have most missing data.
+
+```{r}
+gapminder %>% 
+  group_by((time)) %>% 
+  summarise(missing_co2 = sum(is.na(co2)), missing_co2pc = sum(is.na(co2_PC))) %>% 
+  arrange(desc(missing_co2 + missing_co2pc))
+```
+
+#### 3.2 This is a plot of total CO2 emissions over time for some countries. From the plot, I observed that China has a significant increase on CO2 emissions over time. Other countries on the plot has relative stable CO2 emissions over times.U.S. has the highest emissions around 2006.
+
+```{r}
+library(ggplot2)
+gapminder %>% 
+  filter(name %in% c("United States of America", "China", "India",
+                     "Brazil", "Japan", "Canada"), !is.na(co2)) %>% 
+  ggplot(aes(x = time, y = co2, color = name)) + geom_point() +
+           labs(x = "year", y = "total co2 emissions", color = "country")
+```
+
+#### 3.3 From the plot figure, U.S. and Canada has much higher CO2 emissions per capita compared to China, India, Brazil, and Japan. Both India and Brazil have very stable growing.China has its sudden increase started from 2000. But there has gradually decrease in CO2 emissions per capita for some of the coutries in this plot.
+
+```{r}
+gapminder %>% 
+  filter(name %in% c("United States of America", "China", "India",
+                     "Brazil", "Japan", "Canada"), !is.na(co2_PC)) %>% 
+  ggplot(aes(x = time, y = co2_PC, color = name)) + geom_point() +
+           labs(x = "year", y = "co2 emissions per capita", color = "country")
+```
+
+#### 3.4 Based on the calculated data, I see the average CO2 emissions per capita differ from each regions a lot. **Europe** has the highest average CO2_PC with 7.95. **Africa** has the lowest with 0.93.(This calculation only considers the average emissions per capita for each country, doesn't account for the countries are of different size within each region).
+
+```{r}
+gapminder %>% 
+  group_by(region) %>% 
+  filter(!is.na(region), region != "") %>% 
+  summarise(avg_co2PC = round(mean(co2_PC, na.rm = TRUE), 2))
+
+```
+
+#### 3.5 Below is a barplot that shows the results of average CO2 emissions per capita aross continent in *1960* and *2016*.
+
+```{r}
+gapminder %>% 
+  filter(time %in% c(1960, 2016), !is.na(region), !is.na(co2_PC)) %>%
+  filter(region != "") %>% 
+  group_by(time, region) %>% 
+  summarise(avg_co2PC = mean(co2_PC), .groups = "drop")%>% 
+  ggplot(aes(x = region, y = avg_co2PC, fill = as.factor(time))) + 
+  geom_col( position = "dodge") +
+   labs(title = "Average CO2 Emissions per Capita by Year and Continent",
+       x = "Continent",
+       y = "Average CO2 Emissions per Capita") +
+  scale_fill_discrete( name = "Year")
+              
+```
+
+#### 3.6 It seems like data for 2019 is missing, then I use 2016. This table shows the *three largest* and *three smallest* CO2 emitters(based on CO2 per capita) in 2016 for each region. It is arranged by largest to smallest in terms of region.
+
+```{r}
+library(dplyr)
+gm_2016 <- gapminder %>% filter(time == 2016, !is.na(co2_PC), region != "")
+
+largest_3 <- gm_2016 %>%
+  group_by(region) %>%
+  top_n(3, co2_PC) %>%
+  arrange(region, desc(co2_PC)) %>%
+  select(region, name, co2_PC) %>%
+  ungroup()
+
+smallest_3 <- gm_2016 %>%
+  group_by(region) %>%
+  top_n(-3, co2_PC) %>%
+  arrange(region, co2_PC) %>%
+  select(region, name, co2_PC) %>%
+  ungroup()
+
+large_small <- rbind(largest_3, smallest_3)
+large_small
+```
+
+## 4 GDP per capita(50pt)
+
+#### 4.1 From the scatterplot, It could see that there is a positive correlation between **GDP per capita** and **life expectancy** in 1960. We also can see the countries with the highest GDP per capita are mostly located in Europe and Americas.The lowest appears in Asia and Africa.
+
+```{r}
+gapminder_1960 <- gapminder[gapminder$time == 1960,]
+  ggplot(gapminder_1960 %>%  filter(!is.na(region), region != "", !is.na(GDP_PC), !is.na(lifeExpectancy)), aes(x = GDP_PC, y = lifeExpectancy, 
+                           size = totalPopulation, color = region)) + 
+  geom_point(alpha = 0.7) +
+  scale_size_continuous(range = c(1, 10))+
+  xlab("GDP per capita") + 
+  ylab("Life expectancy")+
+  ggtitle("GDP per capita vs. life expectancy by country for 1960")
+```
+
+#### 4.2 In the scatterplot for 2019, It could see a increasing trend of life expectancy with GDP per capita. The range is wider. Asia has increasing life expectancy.
+
+```{r}
+gapminder_2019 <- gapminder[gapminder$time == 2019,]
+  ggplot(gapminder_2019 %>%  filter(!is.na(region), region != "", !is.na(GDP_PC), !is.na(lifeExpectancy)), aes(x = GDP_PC, y = lifeExpectancy, 
+                           size = totalPopulation, color = region)) + 
+  geom_point(alpha = 0.7) +
+  scale_size_continuous(range = c(1, 10))+
+  xlab("GDP per capita") + 
+  ylab("Life expectancy")+
+  ggtitle("GDP per capita vs. life expectancy by country for 2019")
+
+```
+
+#### 4.3 Comparing the two scatterplot, they shows a positive correlation between **GDP per capita** and **life expectancy** during the last 60 years. In 1960, the difference between each continent is obvious. However, in 2019, we could see the differences has narrowed, the region has lower GDP and life expectancy has grow. It shows the world has made significant development in terms of economics and other social aspects. It still have a lot of room to improve in the future.
+
+4.4 The result fits what I observed from the previous scatterplots. It shows that the *life expectancy* has increased for all continents between 1960 to 2019.
+
+```{r}
+gapminder %>% 
+  filter(time %in% c(1960, 2019), !is.na(lifeExpectancy), !is.na(region), region != "") %>% 
+  group_by(region, time) %>% 
+  summarise(avg_LE = round(mean(lifeExpectancy), 1))
+```
+
+#### 4.5 This table shows the average LE growth from *1960-2019* across the continents in the order of growth. Asia has the highest rate of improvement in 2019, Africa had the lowest average life expectancy in both 1960 and 2019. Europe has the highest life expectancy in both 1960 and 2019, but has the slowest rate of growth.
+
+```{r}
+gapminder %>% 
+  filter(time %in% c(1960, 2019), !is.na(lifeExpectancy), !is.na(region), region != "") %>% 
+  group_by(region, time) %>% 
+  summarise(avg_LE = round(mean(lifeExpectancy),1)) %>% 
+  mutate(prev = lag(avg_LE), growth = avg_LE - prev) %>% 
+  arrange(desc(growth))
+```
+
+#### 4.6 This histogram shows GDP per capita for years of *1960* and *2019*.
+
+```{r}
+library(ggplot2)
+ggplot(data = gapminder %>% filter(time %in% c(1960, 2019), !is.na(GDP_PC)), aes(x = GDP_PC, fill = factor(time))) +
+  geom_histogram(alpha = 0.5, bins = 30, position = "identity") +
+  scale_fill_manual(values = c("red", "lightblue")) +
+  ggtitle("GDP per capita for years of 1960 and 2019") +
+  xlab("GDP per capita") +
+  ylab("Frequency")
+
+```
+
+#### 4.7 US life expectancy ranking in 1960: **17** US life expectancy ranking in 2019: **46**
+
+```{r}
+gapminder %>% 
+  filter(!is.na(lifeExpectancy), name != "", region != "") %>% 
+  group_by(time) %>% 
+  arrange(desc(lifeExpectancy)) %>% 
+  mutate(rank = dense_rank(desc(lifeExpectancy))) %>% 
+  filter(time %in% c("1960", "2019"), name == "United States of America") %>% 
+  summarise(rank = rank[1])
+```
+
+#### 4.8 The relative rank for 1960: **0.0904** The relative rank for 2019: **0.2347**
+
+```{r}
+gapminder %>%
+  filter(!is.na(lifeExpectancy), region != "") %>%
+  group_by(time) %>%
+  summarise(n_countries = n_distinct(name)) %>%
+  left_join(
+    gapminder %>%
+      filter(!is.na(lifeExpectancy), region != "") %>%
+      arrange(time, desc(lifeExpectancy)) %>%
+      group_by(time) %>%
+      mutate(rank = dense_rank(desc(lifeExpectancy))) %>%
+      filter(name == "United States of America") %>%
+      select(time, rank),
+    by = "time"
+  ) %>%
+  mutate(rel_rank = round(rank/n_countries, 4)) %>%
+  filter(time %in% c("1960", "2019")) %>%
+  select(time, rank, rel_rank)
+      
+```
